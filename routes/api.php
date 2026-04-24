@@ -9,7 +9,9 @@ use App\Http\Controllers\Api\WorkoutController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
+    Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/auth/me', [AuthController::class, 'me']);
@@ -21,5 +23,6 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/progress', [ProgressController::class, 'index']);
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::put('/profile', [ProfileController::class, 'update']);
+        Route::post('/profile/onboarding', [ProfileController::class, 'completeOnboarding']);
     });
 });

@@ -13,9 +13,17 @@ class UserProfile extends Model
 
     protected $fillable = [
         'user_id',
+        'nickname',
+        'first_name',
+        'last_name',
         'onboarding_completed',
         'age',
         'gender',
+        'body_type',
+        'fitness_level',
+        'training_days',
+        'training_preference',
+        'main_fitness_goal',
         'weight_kg',
         'height_cm',
         'primary_goal',
