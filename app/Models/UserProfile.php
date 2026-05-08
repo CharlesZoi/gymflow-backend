@@ -34,6 +34,10 @@ class UserProfile extends Model
         'motivation',
         'blockers',
         'theme',
+        'avatar_url',
+        'notification_settings',
+        'membership_plan',
+        'membership_renews_on',
     ];
 
     protected function casts(): array
@@ -42,6 +46,8 @@ class UserProfile extends Model
             'onboarding_completed' => 'boolean',
             'weight_kg' => 'decimal:1',
             'height_cm' => 'decimal:1',
+            'notification_settings' => 'array',
+            'membership_renews_on' => 'date',
         ];
     }
 

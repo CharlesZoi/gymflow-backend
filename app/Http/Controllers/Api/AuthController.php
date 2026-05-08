@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\AuthUserResource;
 use App\Models\User;
+use App\Support\UserProfilePayload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
@@ -21,15 +23,7 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'max:120'],
             'device_name' => ['nullable', 'string'],
             'profile' => ['nullable', 'array'],
-            'profile.nickname' => ['nullable', 'string', 'max:80'],
-            'profile.first_name' => ['nullable', 'string', 'max:80'],
-            'profile.last_name' => ['nullable', 'string', 'max:80'],
-            'profile.body_type' => ['nullable', 'string', 'max:50'],
-            'profile.fitness_level' => ['nullable', 'string', 'max:50'],
-            'profile.training_days' => ['nullable', 'string', 'max:50'],
-            'profile.training_preference' => ['nullable', 'string', 'max:50'],
-            'profile.main_fitness_goal' => ['nullable', 'string', 'max:80'],
-            'profile.onboarding_completed' => ['nullable', 'boolean'],
+            ...UserProfilePayload::rules('profile.'),
         ]);
 
         $user = User::create([
@@ -38,9 +32,7 @@ class AuthController extends Controller
             'password' => Hash::make($data['password']),
         ]);
 
-        $profileAttributes = collect($data['profile'] ?? [])
-            ->filter(fn ($value) => $value !== null && $value !== '')
-            ->all();
+        $profileAttributes = UserProfilePayload::filledAttributes($data['profile'] ?? []);
 
         $profileAttributes['onboarding_completed'] = $profileAttributes['onboarding_completed']
             ?? ! empty($profileAttributes);
@@ -53,12 +45,7 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $token,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'profile' => $user->profile,
-            ],
+            'user' => AuthUserResource::make($user),
         ], 201);
     }
 
@@ -82,12 +69,7 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $token,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'profile' => $user->profile,
-            ],
+            'user' => AuthUserResource::make($user),
         ]);
     }
 
@@ -96,12 +78,7 @@ class AuthController extends Controller
         $user = $request->user()->load('profile');
 
         return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'profile' => $user->profile,
-            ],
+            'user' => AuthUserResource::make($user),
         ]);
     }
 
@@ -134,6 +111,85 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'If that email belongs to a GymFlow member, we just sent reset instructions.',
             'reference' => Str::uuid()->toString(),
+        ]);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'token' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $status = Password::reset(
+            $data,
+            function (User $user, string $password): void {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                    'remember_token' => Str::random(60),
+                ])->save();
+
+                $user->tokens()->delete();
+            }
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            throw ValidationException::withMessages([
+                'email' => ['Unable to reset password with the provided token.'],
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Password reset successfully.',
+        ]);
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = $request->user();
+
+        if (! Hash::check($data['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['The current password is incorrect.'],
+            ]);
+        }
+
+        $user->forceFill([
+            'password' => Hash::make($data['password']),
+        ])->save();
+
+        $user->tokens()->delete();
+
+        return response()->json([
+            'message' => 'Password updated.',
+        ]);
+    }
+
+    public function deleteAccount(Request $request)
+    {
+        $data = $request->validate([
+            'password' => ['required', 'string'],
+        ]);
+
+        $user = $request->user();
+
+        if (! Hash::check($data['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => ['The password is incorrect.'],
+            ]);
+        }
+
+        $user->tokens()->delete();
+        $user->delete();
+
+        return response()->json([
+            'message' => 'Account deleted.',
         ]);
     }
 }

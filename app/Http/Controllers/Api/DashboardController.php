@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ProgressEntry;
 use App\Models\Workout;
 use App\Models\WorkoutSchedule;
+use App\Support\UserProfilePayload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -34,6 +35,7 @@ class DashboardController extends Controller
             ->whereBetween('entry_date', [Carbon::today()->subDays(6), Carbon::today()])
             ->orderBy('entry_date')
             ->get();
+        $questionsCompleted = UserProfilePayload::completedGoalCheckCount($user->profile);
 
         return response()->json([
             'header' => [
@@ -43,7 +45,7 @@ class DashboardController extends Controller
             ],
             'setup' => [
                 'completed' => (bool) $user->profile?->onboarding_completed,
-                'questionsCompleted' => 6,
+                'questionsCompleted' => $questionsCompleted,
                 'questionsTotal' => 6,
             ],
             'todaySession' => $todaySession ? [
